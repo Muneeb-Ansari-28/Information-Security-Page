@@ -14,27 +14,42 @@ body {
 
 h2 {
     color: white;
-    margin-top: 40px;
+    margin-top: 0;
     margin-bottom: 25px;
     font-size: 28px;
+    text-align: center;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-h3 {
-    color: #e0e0e0;
-    margin-bottom: 10px;
-    font-size: 16px;
+.main-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+    padding: 20px;
+}
+
+.calculator-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .calculator {
-    max-width: 100%;
-    margin: 0;
+    max-width: 320px;
+    width: 100%;
     padding: 18px;
     background: #242424;
     border-radius: 12px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     border: 1px solid #333;
+}
+
+.calculator:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 50px rgba(0, 0, 0, 0.6);
 }
 
 input#display {
@@ -92,119 +107,110 @@ button:active {
     flex-wrap: wrap;
 }
 
-.demo-section {
-    max-width: 100%;
-    margin: 0;
-    padding: 18px;
-    background: #242424;
-    border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    border: 1px solid #333;
-    overflow-y: auto;
-    max-height: calc(100vh - 120px);
+/* ===== MODAL STYLES ===== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
-.demo-subsection {
-    margin-bottom: 18px;
-    padding-bottom: 18px;
-    border-bottom: 2px solid #404040;
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
 }
 
-.demo-subsection:last-child {
-    margin-bottom: 0;
-    padding-bottom: 0;
-    border-bottom: none;
+.modal {
+    background: #2c2c2c;
+    border: 1px solid #444;
+    border-radius: 16px;
+    padding: 35px 30px;
+    max-width: 380px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+    transform: scale(0.85);
+    transition: transform 0.3s ease;
 }
 
-.demo-section button {
-    background: linear-gradient(135deg, #404040 0%, #2a2a2a 100%);
-    padding: 10px 18px;
+.modal-overlay.active .modal {
+    transform: scale(1);
+}
+
+.modal-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.modal-title {
+    color: #fff;
+    font-size: 22px;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.modal-text {
+    color: #aaa;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 25px;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.modal-btn {
     width: auto;
-    margin: 8px 4px 8px 0;
-    font-size: 13px;
+    height: auto;
+    padding: 12px 28px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: none;
+}
+
+.modal-btn-cancel {
+    background: #444;
+    color: #ccc;
     border: 1px solid #555;
 }
 
-video {
-    width: 100%;
-    max-width: 350px;
-    margin-top: 10px;
-    border-radius: 8px;
-    background: #1a1a1a;
-    border: 2px solid #333;
+.modal-btn-cancel:hover {
+    background: #555;
+    color: #fff;
+    transform: translateY(-1px);
 }
 
-p#location {
-    margin-top: 10px;
-    padding: 12px;
-    background: #1a1a1a;
-    border-left: 4px solid #555;
-    border-radius: 4px;
-    color: #b0b0b0;
-    font-size: 12px;
-    line-height: 1.5;
+.modal-btn-confirm {
+    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+    color: #fff;
+    border: none;
 }
 
-.main-container {
-    display: flex;
-    height: 100vh;
-    width: 100%;
+.modal-btn-confirm:hover {
+    background: linear-gradient(135deg, #66BB6A 0%, #388E3C 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
 }
 
-.left-section {
-    flex: 1;
-    padding: 40px 30px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    background: #1a1a1a;
-    border-right: 2px solid #404040;
-    overflow: hidden;
-}
-
-.right-section {
-    flex: 1;
-    padding: 40px 30px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    background: #161616;
-    overflow: hidden;
-}
-
-.left-section h2 {
-    text-align: center;
-    margin-bottom: 20px;
-    margin-top: 0;
-}
-
-.right-section h2 {
-    text-align: center;
-    margin-bottom: 20px;
-    margin-top: 0;
-}
-
-@media (max-width: 900px) {
-    .main-container {
-        flex-direction: column;
-        height: auto;
-    }
-
-    .left-section,
-    .right-section {
-        width: 100%;
-        max-width: 100%;
-        border-right: none;
-        border-bottom: 2px solid #404040;
-        padding: 30px 20px;
-    }
-
-    .right-section {
-        border-bottom: none;
-    }
-}
-
+/* ===== RESPONSIVE ===== */
 @media (max-width: 600px) {
     h2 {
         font-size: 24px;
@@ -219,9 +225,5 @@ p#location {
         height: 45px;
         font-size: 16px;
         margin: 5px;
-    }
-
-    .demo-section {
-        padding: 25px;
     }
 }
